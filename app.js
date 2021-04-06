@@ -1,11 +1,16 @@
 //jshint esversion:6
 require('dotenv').config()
-var md5 = require('md5');
+// var md5 = require('md5');
 const express = require("express");
 const bodyParser = require("body-parser");
 const ejs = require("ejs");
 const mongoose = require('mongoose');
 // const encrypt = require("mongoose-encryption");
+const bcrypt = require("bcrypt");
+const passport = require("passport");
+const passportLocalMongoose = require("passport-local-mongoose");
+
+const saltRounds = 10;
 
 mongoose.connect("mongodb://localhost:27017/userDB", { useNewUrlParser: true ,  useUnifiedTopology: true});
 
@@ -45,34 +50,41 @@ app.get("/register", function (req,res) {
 
 app.post("/register", function (req,res) {
 
-  const newUser = new User({
-    email:req.body.username,
-    password: md5(req.body.password)
+  bcrypt.hash(req.body.password, saltRounds, function(err, hash) {
+    // Store hash in your password DB.
+
+    const newUser = new User({
+      email:req.body.username,
+      password: hash
+    });
+    newUser.save(function (err) {
+      if(err){
+        log(err);
+      } else{
+        res.render("secrets");
+      }
+    });
   });
-  newUser.save(function (err) {
-    if(err){
-      log(err);
-    } else{
-      res.render("secrets");
-    }
-  });
+
+  
 
 });
 
 app.post("/login", function (req,res) {
   const username = req.body.username;
-  const password = md5(req.body.password);
+  const password = req.body.password;
 
   User.findOne({email: username}, function(err, foundUser) {
     if(err){
       console.log(err);
     } else{
       if(foundUser){
-        if(password === foundUser.password){
-        res.render("secrets");
-      } else{
-        res.render("login");
-      }
+        bcrypt.compare(password, foundUser.password, function(err, result) {
+          if(result===true){
+            res.render("secrets");
+          }
+          // result == true
+      });
       }
       
     }
